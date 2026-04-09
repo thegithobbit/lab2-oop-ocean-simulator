@@ -1,23 +1,28 @@
 #ifndef OCEAN_H
 #define OCEAN_H
 
-#include <QMainWindow>
+#include <QObject>
+#include <vector>
+#include <memory>
+#include "entities/ICreature.h"
 
-QT_BEGIN_NAMESPACE
-namespace Ui {
-class MainWindow;
-}
-QT_END_NAMESPACE
-
-class MainWindow : public QMainWindow
-{
+class Ocean : public QObject {
     Q_OBJECT
-
 public:
-    MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
+    explicit Ocean(QObject *parent = nullptr) : QObject(parent) {}
+
+    void addCreature(std::shared_ptr<ICreature> creature) {
+        creatures.push_back(creature);
+    }
+
+    void updateAll() {
+        for (auto& creature : creatures) {
+            creature->update();
+        }
+    }
 
 private:
-    Ui::MainWindow *ui;
+    std::vector<std::shared_ptr<ICreature>> creatures;
 };
+
 #endif // OCEAN_H
