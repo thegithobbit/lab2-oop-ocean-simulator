@@ -12,6 +12,9 @@
 #include <QAbstractItemView>
 #include <QBrush>
 #include <QColor>
+#include <QDateTime>
+#include <QFile>
+#include <QFileDialog>
 #include <QGraphicsEllipseItem>
 #include <QGraphicsScene>
 #include <QGraphicsView>
@@ -20,6 +23,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPen>
@@ -30,6 +34,7 @@
 #include <QStatusBar>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QTextStream>
 #include <QTimer>
 #include <QToolBar>
 #include <QVBoxLayout>
@@ -42,6 +47,7 @@ MainWindow::MainWindow(QWidget *parent)
       scene_(new QGraphicsScene(this)),
       oceanView_(nullptr),
       creaturesTable_(nullptr),
+      eventLog_(nullptr),
       searchEdit_(nullptr),
       typeFilter_(nullptr),
       speedSlider_(nullptr),
@@ -97,12 +103,14 @@ QWidget *MainWindow::buildSimulationPage()
     auto *stepButton = new QPushButton("Step", page);
     auto *resetButton = new QPushButton("Reset", page);
     auto *addButton = new QPushButton("Add creature", page);
+    auto *statsButton = new QPushButton("Statistics", page);
 
     buttons->addWidget(startButton);
     buttons->addWidget(pauseButton);
     buttons->addWidget(stepButton);
     buttons->addWidget(resetButton);
     buttons->addWidget(addButton);
+    buttons->addWidget(statsButton);
     buttons->addStretch();
 
     oceanView_ = new QGraphicsView(scene_, page);
@@ -117,6 +125,7 @@ QWidget *MainWindow::buildSimulationPage()
     connect(stepButton, &QPushButton::clicked, this, &MainWindow::stepSimulation);
     connect(resetButton, &QPushButton::clicked, this, &MainWindow::resetSimulation);
     connect(addButton, &QPushButton::clicked, this, &MainWindow::addCreature);
+    connect(statsButton, &QPushButton::clicked, this, &MainWindow::showStatisticsPage);
 
     return page;
 }
@@ -223,6 +232,9 @@ QWidget *MainWindow::buildStatisticsPage()
 
     auto *resetButton = new QPushButton("Reset demo data", page);
     auto *creaturesButton = new QPushButton("Open creature table", page);
+    auto *exportButton = new QPushButton("Export report", page);
+    auto *clearLogButton = new QPushButton("Clear log", page);
+    eventLog_ = new QListWidget(page);
 
     layout->addWidget(new QLabel("Total creatures", page), 0, 0);
     layout->addWidget(totalLabel_, 0, 1);
@@ -238,10 +250,16 @@ QWidget *MainWindow::buildStatisticsPage()
     layout->addWidget(energyLabel_, 5, 1);
     layout->addWidget(resetButton, 6, 0);
     layout->addWidget(creaturesButton, 6, 1);
-    layout->setRowStretch(7, 1);
+    layout->addWidget(exportButton, 7, 0);
+    layout->addWidget(clearLogButton, 7, 1);
+    layout->addWidget(new QLabel("Event log", page), 8, 0, 1, 2);
+    layout->addWidget(eventLog_, 9, 0, 1, 2);
+    layout->setRowStretch(9, 1);
 
     connect(resetButton, &QPushButton::clicked, this, &MainWindow::resetSimulation);
     connect(creaturesButton, &QPushButton::clicked, this, &MainWindow::showCreaturesPage);
+    connect(exportButton, &QPushButton::clicked, this, &MainWindow::exportReport);
+    connect(clearLogButton, &QPushButton::clicked, this, &MainWindow::clearLog);
 
     return page;
 }
@@ -322,6 +340,45 @@ void MainWindow::refreshStats()
     energyLabel_->setText(QString::number(stats.averageEnergy, 'f', 1));
 }
 
+void MainWindow::addLogMessage(const QString& message)
+{
+    if (!eventLog_) {
+        return;
+    }
+
+    const QString time = QDateTime::currentDateTime().toString("HH:mm:ss");
+    eventLog_->insertItem(0, QString("[%1] %2").arg(time, message));
+}
+
+QString MainWindow::buildReportText() const
+{
+    const auto stats = ocean_.stats();
+    QString report;
+    QTextStream stream(&report);
+
+    stream << "Ocean Simulator report\n";
+    stream << "======================\n\n";
+    stream << "Total creatures: " << stats.total << "\n";
+    stream << "Alive creatures: " << stats.alive << "\n";
+    stream << "Fish: " << stats.fish << "\n";
+    stream << "Sharks: " << stats.sharks << "\n";
+    stream << "Plankton: " << stats.plankton << "\n";
+    stream << "Average energy: " << QString::number(stats.averageEnergy, 'f', 1) << "\n\n";
+    stream << "Creatures\n";
+
+    for (const auto& creature : ocean_.getCreatures()) {
+        stream << "#" << creature->getId()
+               << " " << QString::fromStdString(creature->getType())
+               << " x=" << QString::number(creature->getX(), 'f', 1)
+               << " y=" << QString::number(creature->getY(), 'f', 1)
+               << " energy=" << QString::number(creature->getEnergy(), 'f', 1)
+               << " alive=" << (creature->isAlive() ? "yes" : "no")
+               << "\n";
+    }
+
+    return report;
+}
+
 int MainWindow::selectedCreatureId() const
 {
     const auto selected = creaturesTable_->selectedItems();
@@ -355,18 +412,21 @@ void MainWindow::startSimulation()
 {
     timer_->start(1100 - speedSlider_->value() * 100);
     statusLabel_->setText("Simulation is running");
+    addLogMessage("Simulation started");
 }
 
 void MainWindow::pauseSimulation()
 {
     timer_->stop();
     statusLabel_->setText("Simulation paused");
+    addLogMessage("Simulation paused");
 }
 
 void MainWindow::stepSimulation()
 {
     ocean_.step();
     statusLabel_->setText("One simulation step completed");
+    addLogMessage("Simulation step completed");
 }
 
 void MainWindow::resetSimulation()
@@ -374,6 +434,7 @@ void MainWindow::resetSimulation()
     timer_->stop();
     ocean_.seedDemoData();
     statusLabel_->setText("Demo data restored");
+    addLogMessage("Demo data restored");
 }
 
 void MainWindow::addCreature()
@@ -392,6 +453,7 @@ void MainWindow::addCreature()
         ocean_.addCreature(std::make_shared<Fish>(data.x, data.y, data.energy));
     }
     statusLabel_->setText("Creature added");
+    addLogMessage(QString("%1 added").arg(data.type));
 }
 
 void MainWindow::editCreature()
@@ -418,6 +480,7 @@ void MainWindow::editCreature()
             const auto data = dialog.data();
             ocean_.updateCreature(id, data.type, data.x, data.y, data.energy);
             statusLabel_->setText("Creature updated");
+            addLogMessage(QString("Creature #%1 updated").arg(id));
         }
         return;
     }
@@ -433,6 +496,7 @@ void MainWindow::deleteCreature()
     if (QMessageBox::question(this, "Delete creature", "Delete selected creature?") == QMessageBox::Yes) {
         ocean_.removeCreature(id);
         statusLabel_->setText("Creature deleted");
+        addLogMessage(QString("Creature #%1 deleted").arg(id));
     }
 }
 
@@ -440,6 +504,38 @@ void MainWindow::applySettings()
 {
     ocean_.setSize(widthSpin_->value(), heightSpin_->value());
     statusLabel_->setText("Settings applied");
+    addLogMessage("Ocean size settings applied");
+}
+
+void MainWindow::exportReport()
+{
+    const QString fileName = QFileDialog::getSaveFileName(
+        this,
+        "Export report",
+        "ocean_report.txt",
+        "Text files (*.txt)"
+    );
+
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Export report", "Could not save report file.");
+        return;
+    }
+
+    QTextStream stream(&file);
+    stream << buildReportText();
+    statusLabel_->setText("Report exported");
+    addLogMessage("Report exported");
+}
+
+void MainWindow::clearLog()
+{
+    eventLog_->clear();
+    statusLabel_->setText("Event log cleared");
 }
 
 void MainWindow::onSearchChanged(const QString&)
