@@ -16,18 +16,26 @@ set(PROJECT_SOURCES
     main.cpp
     Ocean.cpp
     Ocean.h
-    core/entities/Creature.cpp
-    core/entities/Creature.h
+    mainwindow.cpp
+    mainwindow.h
     mainwindow.ui
+    creaturedialog.cpp
+    creaturedialog.h
+    core/entities/creature.cpp
+    core/entities/creature.h
+    core/entities/fish.cpp
+    core/entities/fish.h
+    core/entities/shark.cpp
+    core/entities/shark.h
+    core/entities/plankton.cpp
+    core/entities/plankton.h
+    core/entities/ICreature.h
+    core/entities/IVisitor.h
 )
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(OceanSimulator
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        core/entities/creature.h core/entities/creature.cpp
-        core/entities/ICreature.h
-        mainwindow.h mainwindow.cpp
-        core/entities/IVisitor.h
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET OceanSimulator APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
