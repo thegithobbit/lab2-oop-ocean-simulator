@@ -14,6 +14,7 @@ class QGraphicsScene;
 class QGraphicsView;
 class QLabel;
 class QLineEdit;
+class QListWidget;
 class QPushButton;
 class QSlider;
 class QSpinBox;
@@ -39,6 +40,8 @@ private:
     void refreshScene();
     void refreshTable();
     void refreshStats();
+    void addLogMessage(const QString& message);
+    QString buildReportText() const;
     int selectedCreatureId() const;
 
 private slots:
@@ -54,6 +57,8 @@ private slots:
     void editCreature();
     void deleteCreature();
     void applySettings();
+    void exportReport();
+    void clearLog();
     void onSearchChanged(const QString& text);
     void onTypeFilterChanged(const QString& type);
     void onSpeedChanged(int value);
@@ -68,6 +73,7 @@ private:
     QGraphicsScene *scene_;
     QGraphicsView *oceanView_;
     QTableWidget *creaturesTable_;
+    QListWidget *eventLog_;
     QLineEdit *searchEdit_;
     QComboBox *typeFilter_;
     QSlider *speedSlider_;
